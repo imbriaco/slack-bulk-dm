@@ -1,5 +1,5 @@
-bulk-dm
--------
+slack-bulk-dm
+-------------
 
 This is a very simple Ruby utility to send a direct message to a group of users in Slack.
 
