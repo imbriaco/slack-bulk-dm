@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+if !File.exists?(".bundle")
+  puts "Installing dependencies:\n"
+  system "bundle install --path .bundle"
+  puts "\nDone.\n\n"
+end
+
+require "bundler/setup"
+require "highline/import"
+require "json"
+require "slack"
+
+CONFIG_FILE = ENV["MESSAGE"]         || "message.json"
+SLACK_TOKEN = ENV["SLACK_API_TOKEN"] || abort("Error: You mst set the SLACK_API_TOKEN environment variable.")
+
+if File.exists?(CONFIG_FILE)
+  config = JSON.parse(File.read(CONFIG_FILE)) || abort("Error: Unable to read #{CONFIG_FILE}: #{$!}")
+  slack = Slack::Client.new(token: SLACK_TOKEN)
+  user_ids = Hash[slack.users_list["members"].map { |user| [ user["name"], user["id"] ] }]
+
+  recipients = config["users"].map do |name|
+    user_ids[name] || abort("Error: Unable to find a Slack user named #{name}")
+  end
+
+  say "<%= color('Recipients: ', BOLD) %> #{config['users'].join(', ')}\n"
+  say "<%= color('Message:    ', BOLD) %> #{config['message']}\n\n"
+
+  answer = ask ("Okay to send? (y/N) ")  { |q| q.character = true }
+  exit unless answer.match(/[yY]/)
+  say "\n<%= color('Sending message: ', BOLD) %>"
+
+  recipients.each do |user_id|
+    say "<%= color('.', GREEN) %>"
+    channel = slack.im_open(user: user_id)["channel"]["id"]
+    slack.chat_postMessage(channel: channel, text: config["message"], parse: :full, as_user: true)
+  end
+else
+  abort("Error: Cannot find a #{CONFIG_FILE} file with sending instructions.")
+end
